@@ -103,6 +103,28 @@ export class RestAPIStack extends cdk.Stack {
       "GET",
       new apig.LambdaIntegration(getMovieByIdFn, { proxy: true })
     );
+
+    
+
+       //... other lambda functions ...
+
+   const newMovieFn = new lambdanode.NodejsFunction(this, "AddMovieFn", {
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: `${__dirname}/../lambdas/addMovie.ts`,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: moviesTable.tableName,
+        REGION: "eu-west-1",
+      },
+    });
+    moviesTable.grantWriteData(newMovieFn);
+
+     moviesEndpoint.addMethod(
+      "POST",
+      new apig.LambdaIntegration(newMovieFn, { proxy: true })
+    );
   
         
         
