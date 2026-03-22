@@ -33,7 +33,6 @@ export class RestAPIStack extends cdk.Stack {
       sortKey: { name: "roleName", type: dynamodb.AttributeType.STRING },
     });
 
-
     // Functions
     const getMovieByIdFn = new lambdanode.NodejsFunction(this, "GetMovieByIdFn", {
       architecture: lambda.Architecture.ARM_64,
@@ -43,6 +42,7 @@ export class RestAPIStack extends cdk.Stack {
       memorySize: 128,
       environment: {
         TABLE_NAME: moviesTable.tableName,
+        CAST_TABLE_NAME: movieCastsTable.tableName,
         REGION: "eu-west-1",
       },
     });
@@ -83,10 +83,8 @@ export class RestAPIStack extends cdk.Stack {
       },
     });
 
-    
     const getMovieCastMembersFn = new lambdanode.NodejsFunction(
-      this,
-      "GetCastMemberFn",
+      this, "GetCastMemberFn",
       {
         architecture: lambda.Architecture.ARM_64,
         runtime: lambda.Runtime.NODEJS_22_X,
@@ -97,37 +95,34 @@ export class RestAPIStack extends cdk.Stack {
           TABLE_NAME: movieCastsTable.tableName,
           REGION: "eu-west-1",
         },
-    }
- );
-
+      }
+    );
 
     // Seed Data
-      new custom.AwsCustomResource(this, "moviesddbInitData", {
+    new custom.AwsCustomResource(this, "moviesddbInitData", {
       onCreate: {
         service: "DynamoDB",
         action: "batchWriteItem",
         parameters: {
           RequestItems: {
             [moviesTable.tableName]: generateBatch(movies),
-            [movieCastsTable.tableName]: generateBatch(movieCasts),  // Added
+            [movieCastsTable.tableName]: generateBatch(movieCasts),
           },
         },
         physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"),
       },
       policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
-        resources: [moviesTable.tableArn, movieCastsTable.tableArn],  // Includes movie cast
+        resources: [moviesTable.tableArn, movieCastsTable.tableArn],
       }),
     });
-
 
     // Permissions
     moviesTable.grantReadData(getMovieByIdFn);
     moviesTable.grantReadData(getAllMoviesFn);
     moviesTable.grantReadWriteData(newMovieFn);
     moviesTable.grantReadWriteData(deleteMovieFn);
-    
     movieCastsTable.grantReadData(getMovieCastMembersFn);
-
+    movieCastsTable.grantReadData(getMovieByIdFn);
 
     // REST API
     const api = new apig.RestApi(this, "RestAPI", {
@@ -165,11 +160,9 @@ export class RestAPIStack extends cdk.Stack {
     );
 
     const movieCastEndpoint = moviesEndpoint.addResource("cast");
-
     movieCastEndpoint.addMethod(
       "GET",
       new apig.LambdaIntegration(getMovieCastMembersFn, { proxy: true })
     );
-
   }
 }
